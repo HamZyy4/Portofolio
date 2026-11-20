@@ -1,11 +1,10 @@
 (()=>{
 const root=document.documentElement;root.classList.add('js');
 const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
-
 /* mobile menu */
 const menu=$('#mobileMenu'),mt=$('#menuToggle');
 mt?.addEventListener('click',()=>{const closed=menu.classList.toggle('hidden');mt.setAttribute('aria-expanded',String(!closed));mt.textContent=closed?'Menu':'Close'});
-$$('a',menu).forEach(a=>a.addEventListener('click',()=>{menu.classList.add('hidden');mt.textContent='Menu'}));
+$$('a',menu).forEach(a=>a.addEventListener('click',()=>{menu.classList.add('hidden');mt.textContent='Menu';mt.setAttribute('aria-expanded','false')}));
 $('#year').textContent=new Date().getFullYear();
 
 /* language (EN / ID) */
@@ -33,16 +32,167 @@ const mio=new IntersectionObserver(es=>es.forEach(e=>e.target.classList.toggle('
 $$('.marquee,.run').forEach(el=>mio.observe(el));
 document.addEventListener('visibilitychange',()=>root.classList.toggle('tab-hidden',document.hidden));
 
-/* stack filter with soft fade */
-const cards=$$('.tech-card');
-$$('.filter').forEach(b=>b.addEventListener('click',()=>{
-  $$('.filter').forEach(x=>x.classList.remove('on'));b.classList.add('on');const c=b.dataset.cat;
-  cards.forEach(card=>card.classList.add('out'));
-  setTimeout(()=>{cards.forEach(card=>{card.classList.toggle('hide',c!=='all'&&card.dataset.cat!==c)});requestAnimationFrame(()=>cards.forEach(card=>card.classList.remove('out')))},180)}));
+/* =====================================
+   STACK FILTER - SMOOTH TRANSITION
+===================================== */
 
-/* spotlight (pointer devices only) */
-if(matchMedia('(hover:hover)').matches){$$('.spot').forEach(el=>el.addEventListener('pointermove',e=>{const r=el.getBoundingClientRect();el.style.setProperty('--mx',(e.clientX-r.left)+'px');el.style.setProperty('--my',(e.clientY-r.top)+'px')},{passive:true}))}
+const cards = $$('.tech-card');
+const filters = $$('.filter');
 
-/* copy email */
-$('#copyMail')?.addEventListener('click',async e=>{const b=e.currentTarget,o=b.textContent;try{await navigator.clipboard.writeText('ilhamarten07@gmail.com');b.textContent=lang==='en'?'Copied':'Tersalin';setTimeout(()=>{b.textContent=o},1600)}catch(_){}});
+let filterTimer = null;
+let filterVersion = 0;
+
+filters.forEach(button => {
+    button.addEventListener('click', () => {
+
+        const category = button.dataset.cat;
+        const version = ++filterVersion;
+
+        clearTimeout(filterTimer);
+
+        filters.forEach(item => {
+            const active = item === button;
+
+            item.classList.toggle('on', active);
+            item.setAttribute('aria-selected', String(active));
+        });
+
+        cards.forEach(card => {
+            card.classList.add('out');
+        });
+
+        filterTimer = setTimeout(() => {
+
+            if (version !== filterVersion) return;
+
+            cards.forEach(card => {
+                const shouldHide =
+                    category !== 'all' &&
+                    card.dataset.cat !== category;
+
+                card.classList.toggle('hide', shouldHide);
+            });
+
+            requestAnimationFrame(() => {
+
+                if (version !== filterVersion) return;
+
+                cards.forEach(card => {
+                    card.classList.remove('out');
+                });
+
+            });
+
+        }, 220);
+
+    });
+});
+/* =====================================
+   HERO IMAGE LOADER
+===================================== */
+
+const heroImage = $('#heroBackground');
+
+if (heroImage) {
+    const showHero = () => {
+        heroImage.classList.add('is-loaded');
+    };
+
+    const loadHero = async () => {
+        try {
+            if (heroImage.decode) {
+                await heroImage.decode();
+            }
+        } catch (error) {
+            // Image may already be decoded by the browser.
+        }
+
+        if (heroImage.naturalWidth > 0) {
+            requestAnimationFrame(showHero);
+        }
+    };
+
+    if (heroImage.complete) {
+        loadHero();
+    } else {
+        heroImage.addEventListener('load', loadHero, {
+            once: true
+        });
+
+        heroImage.addEventListener('error', () => {
+            heroImage.classList.remove('is-loaded');
+        }, {
+            once: true
+        });
+    }
+}
+
+/* =====================================
+   SPOTLIGHT - RAF OPTIMIZED
+===================================== */
+
+if (matchMedia('(hover:hover) and (pointer:fine)').matches) {
+
+    $$('.spot').forEach(el => {
+
+        let frame = null;
+        let latestX = 0;
+        let latestY = 0;
+
+        el.addEventListener('pointermove', e => {
+
+            const rect = el.getBoundingClientRect();
+
+            latestX = e.clientX - rect.left;
+            latestY = e.clientY - rect.top;
+
+            if (frame) return;
+
+            frame = requestAnimationFrame(() => {
+
+                el.style.setProperty('--mx', `${latestX}px`);
+                el.style.setProperty('--my', `${latestY}px`);
+
+                frame = null;
+
+            });
+
+        }, { passive: true });
+
+        el.addEventListener('pointerleave', () => {
+            if (frame) {
+                cancelAnimationFrame(frame);
+                frame = null;
+            }
+        });
+
+    });
+
+}
+const copyMail = document.querySelector('#copyMail');
+
+if (copyMail) {
+    copyMail.addEventListener('click', async () => {
+        try {
+            await navigator.clipboard.writeText(
+                'ilhamarten07@gmail.com'
+            );
+
+            const original = copyMail.textContent;
+
+            copyMail.textContent =
+                document.documentElement.lang === 'id'
+                    ? 'Email berhasil disalin'
+                    : 'Email copied successfully';
+
+            setTimeout(() => {
+                copyMail.textContent = original;
+            }, 1800);
+
+        } catch (error) {
+            window.location.href =
+                'mailto:ilhamarten07@gmail.com';
+        }
+    });
+}
 })();
